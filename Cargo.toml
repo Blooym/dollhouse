@@ -17,9 +17,9 @@ lto = true
 anyhow = "1.0.97"
 axum = { version = "0.8.3", features = ["http2", "macros", "multipart"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
-blake3 = { version = "1.7.0", features = ["zeroize", "rayon"] }
+blake3 = { version = "1.8.1", features = ["zeroize", "rayon"] }
 bytesize = "2.0.1"
-clap = { version = "4.5.34", features = ["derive", "env", "string"] }
+clap = { version = "4.5.35", features = ["derive", "env", "string"] }
 chacha20poly1305 = "0.10.1"
 clap-duration = "0.1.11"
 dirs = "6.0.0"

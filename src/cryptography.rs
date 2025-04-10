@@ -22,7 +22,7 @@ impl Cryptography {
     pub fn encrypt(bytes: &[u8]) -> Result<(String, Vec<u8>)> {
         let key = CryptoImpl::generate_key(&mut OsRng);
         let nonce = CryptoImpl::generate_nonce(&mut OsRng);
-        let cipher = CryptoImpl::new_from_slice(&key)?;
+        let cipher = CryptoImpl::new(&key);
         let mut ciphered_bytes = match cipher.encrypt(&nonce, bytes) {
             Ok(b) => b,
             Err(err) => {
