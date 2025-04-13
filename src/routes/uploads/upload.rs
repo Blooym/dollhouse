@@ -79,7 +79,7 @@ pub async fn create_upload_handler(
     // Store file by hash to prevent duplicating uploads.
     let filename = format!(
         "{}.{}",
-        Cryptography::hash_from_bytes(&data, &state.persisted_salt)
+        Cryptography::hash_bytes(&data, &state.persisted_salt)
             .unwrap()
             .get(..10)
             .unwrap(),

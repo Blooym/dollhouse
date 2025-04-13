@@ -25,11 +25,7 @@ impl StorageProvider {
     fn is_file_expired(&self, filename: &str) -> Result<bool> {
         let metadata = fs::metadata(self.base_path.join(filename))?;
         let last_access = metadata.accessed()?;
-        if last_access + self.expire_after <= SystemTime::now() {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        Ok(last_access + self.expire_after <= SystemTime::now())
     }
 
     pub fn remove_all_expired_files(&self) -> Result<()> {
@@ -41,7 +37,7 @@ impl StorageProvider {
                     return;
                 };
                 if self.is_file_expired(&file_name).unwrap() {
-                    info!("'{}' has expired - deleting from storage.", file_name);
+                    info!("file '{}' expired - deleting from storage.", file_name);
                     self.delete_file(&file_name).unwrap();
                 }
             });

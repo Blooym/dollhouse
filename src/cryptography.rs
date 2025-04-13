@@ -51,7 +51,7 @@ impl Cryptography {
     ///
     /// Will automatically use multiple threads when the provided
     /// byte array is beyond a certain length.
-    pub fn hash_from_bytes(bytes: &[u8], salt: &str) -> Result<String> {
+    pub fn hash_bytes(bytes: &[u8], salt: &str) -> Result<String> {
         let mut hasher = Hasher::new();
 
         // 100 MB
