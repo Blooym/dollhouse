@@ -7,18 +7,16 @@
 >
 > No support will be offered for this software. Breaking changes to functionalty or features may be made any time.
 
-A safe & encrypted place to share files. 🎀
+Server for creating file share links and embedding media on websites. 🎀
 
 ## Features
 
-- **Ephemeral-first**: All uploads are treated as temporary and will be automatically deleted based on time since last access.
+- **Ephemeral-first**: All uploads are treated as temporary and will be automatically deleted based on last access time.
 
 - **Storage-efficient**: All uploads are deduplicated by writing them to disk as `<hash>.<ext>`. Hashes are salted with a persistent key generated on first-time startup.
 
-- **Encrypted at rest**: All uploads are encrypted by the server during upload. The decryption key is only sent to the uploader and is not stored on the server. No upload can be accessed without the decryption key, even with access to the filesystem.
-  - Note: as encyption and decryption is handled server-side a malicious actor with access to the server could intercept data unencrypted or read decryption keys. This is an intentional flaw to allow uploads to embed on any website.
-
-- **Configurable and simple**: Running the server should is as simple as pulling the docker container or building the binary, changing a few configuration options, and starting the server.
+- **Encrypted at rest**: All uploads are encrypted by the server when stored. The decryption key is attached to the returned share url and is not stored by the server. No upload can be accessed without the decryption key, even with access to the filesystem.
+  - Note: encyption and decryption are handled server-side, anybody with access to the server network could intercept data unencrypted or or decryption keys from logs. This is intentional as it allows uploads to embed on all websites. 
 
 ## Setup
 
