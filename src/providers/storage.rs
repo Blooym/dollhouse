@@ -10,25 +10,21 @@ use tracing::{debug, info};
 #[derive(Debug)]
 pub struct StorageProvider {
     base_path: PathBuf,
-    expire_after: Duration,
 }
 
 impl StorageProvider {
-    pub fn new(base_path: PathBuf, expire_after: Duration) -> Result<Self> {
+    pub fn new(base_path: PathBuf) -> Result<Self> {
         fs::create_dir_all(&base_path)?;
-        Ok(Self {
-            base_path,
-            expire_after,
-        })
+        Ok(Self { base_path })
     }
 
-    fn is_file_expired(&self, filename: &str) -> Result<bool> {
+    fn is_file_expired(&self, filename: &str, expire_after: Duration) -> Result<bool> {
         let metadata = fs::metadata(self.base_path.join(filename))?;
         let last_access = metadata.accessed()?;
-        Ok(last_access + self.expire_after <= SystemTime::now())
+        Ok(last_access + expire_after <= SystemTime::now())
     }
 
-    pub fn remove_all_expired_files(&self) -> Result<()> {
+    pub fn remove_all_expired_files(&self, expire_after: Duration) -> Result<()> {
         fs::read_dir(&self.base_path)
             .unwrap()
             .filter_map(|f| f.ok())
@@ -36,7 +32,7 @@ impl StorageProvider {
                 let Ok(file_name) = file.file_name().into_string() else {
                     return;
                 };
-                if self.is_file_expired(&file_name).unwrap() {
+                if self.is_file_expired(&file_name, expire_after).unwrap() {
                     info!("file '{}' expired - deleting from storage.", file_name);
                     self.delete_file(&file_name).unwrap();
                 }

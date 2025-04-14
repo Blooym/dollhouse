@@ -38,7 +38,7 @@ const PERSISTED_SALT_FILENAME: &str = "persisted_salt";
 #[derive(Debug, Clone, Parser)]
 #[clap(author, about, version)]
 struct Arguments {
-    /// The internet socket address that the server should be ran on.
+    /// Internet socket address that the server should be ran on.
     #[arg(
         long = "address",
         env = "DOLLHOUSE_ADDRESS",
@@ -46,7 +46,7 @@ struct Arguments {
     )]
     address: SocketAddr,
 
-    /// The base url to use when generating links to uploads.
+    /// Base url to use when generating links to uploads.
     ///
     /// This is only for link generation, you'll need to handle the reverse proxy yourself.
     #[arg(
@@ -65,7 +65,7 @@ struct Arguments {
     )]
     tokens: Vec<String>,
 
-    /// A path to the directory where data should be stored.
+    /// Path to the directory where data should be stored.
     ///
     /// CAUTION: This directory should not be used for anything else as it and all subdirectories will be automatically managed.
     #[clap(
@@ -75,17 +75,11 @@ struct Arguments {
     )]
     data_path: PathBuf,
 
-    /// The amount of time since last access before a file is automatically purged from storage.
-    #[clap(long = "upload-expiry-time", env = "DOLLHOUSE_UPLOAD_EXPIRY_TIME", default_value="31 days", value_parser = duration_range_value_parse!(min: 1min, max: 100years))]
-    upload_expiry_time: DurationHuman,
+    /// Time since since last access before a file is automatically purged from storage.
+    #[clap(long = "upload-expiry", env = "DOLLHOUSE_UPLOAD_EXPIRY", value_parser = duration_range_value_parse!(min: 1min, max: 100years))]
+    upload_expiry: Option<DurationHuman>,
 
-    /// The interval to run the expiry check on.
-    ///
-    /// This may be an intensive operation if you store thousands of files with long expiry times.
-    #[clap(long = "upload-expiry-interval", env = "DOLLHOUSE_UPLOAD_EXPIRY_INTERVAL", default_value="60 min", value_parser = duration_range_value_parse!(min: 1min, max: 100years))]
-    upload_expiry_interval: DurationHuman,
-
-    /// The maximum file size that is allowed to be uploaded.
+    /// Maximum file size that can be uploaded.
     #[clap(
         long = "upload-size-limit",
         env = "DOLLHOUSE_UPLOAD_SIZE_LIMIT",
@@ -93,7 +87,7 @@ struct Arguments {
     )]
     upload_size_limit: ByteSize,
 
-    /// File mimetypes that are allowed to be uploaded.
+    /// File mimetypes that can be uploaded.
     /// Supports type wildcards (e.g. 'image/*', '*/*').
     ///
     /// MIME types are determined by the magic numbers of uploaded content, if the mimetype cannot be determined the server will either:
@@ -115,15 +109,8 @@ struct Arguments {
 struct AppState {
     storage_provider: Arc<StorageProvider>,
     auth_provider: Arc<AuthProvider>,
-
-    /// Base URL for use when returning public facing links.
     public_base_url: Url,
-
-    /// File mimetypes that are allowed to be uploaded.
-    /// Supports type wildcards (e.g. 'image/*', '*/*').
     upload_allowed_mimetypes: Vec<Mime>,
-
-    /// Used for all hash operations to avoid rainbow tables.
     persisted_salt: String,
 }
 
@@ -136,10 +123,7 @@ async fn main() -> Result<()> {
     let args = Arguments::parse();
 
     // Init required state.
-    let storage = Arc::new(StorageProvider::new(
-        args.data_path.join(UPLOADS_DIRNAME),
-        Duration::from(&args.upload_expiry_time),
-    )?);
+    let storage = Arc::new(StorageProvider::new(args.data_path.join(UPLOADS_DIRNAME))?);
     let persisted_salt = {
         let path = args.data_path.join(PERSISTED_SALT_FILENAME);
         if let Some(salt) = Cryptography::get_persisted_salt(&path)? {
@@ -150,12 +134,28 @@ async fn main() -> Result<()> {
     };
     let state = AppState {
         storage_provider: Arc::clone(&storage),
-        auth_provider: Arc::new(AuthProvider::new(args.tokens)),
+        auth_provider: Arc::new(AuthProvider::new(args.tokens.clone())),
         public_base_url: args.public_url.clone(),
-        upload_allowed_mimetypes: args.upload_mimetypes,
+        upload_allowed_mimetypes: args.upload_mimetypes.clone(),
         persisted_salt,
     };
 
+    // Background task for expiring files.
+    if let Some(expire_after) = args.upload_expiry.map(|e| Duration::from(&e)) {
+        let storage_clone = Arc::clone(&storage);
+        tokio::spawn(async move {
+            loop {
+                debug!("Running file expiry check");
+                storage_clone
+                    .remove_all_expired_files(expire_after)
+                    .unwrap();
+                tokio::time::sleep(Duration::from_secs(60)).await;
+            }
+        });
+    }
+
+    // Start server.
+    let tcp_listener = TcpListener::bind(args.address).await?;
     let router = Router::new()
         .route("/", get(routes::index_handler))
         .route("/index.css", get(routes::index_css_handler))
@@ -215,21 +215,23 @@ async fn main() -> Result<()> {
             },
         ))
         .with_state(state);
-
-    // File expiry background task.
-    let storage_clone = Arc::clone(&storage);
-    tokio::spawn(async move {
-        loop {
-            debug!("Running check to find expired files");
-            storage_clone.remove_all_expired_files().unwrap();
-            tokio::time::sleep(Duration::from(&args.upload_expiry_interval)).await;
-        }
-    });
-
-    let tcp_listener = TcpListener::bind(args.address).await?;
     info!(
-        "\nInternal server started\n* Listening on: http://{}\n* Exposed as {}",
-        args.address, args.public_url
+        "Internal server started\n\
+         * Listening on: http://{}\n\
+         * Public URL: {}\n\
+         * Data path: {:?}\n\
+         * Upload size limit: {}\n\
+         * Upload expiry: {}\n\
+         * Allowed mimetypes: {:?}\n\
+         * Tokens configured: {}",
+        args.address,
+        args.public_url,
+        args.data_path,
+        args.upload_size_limit.display().si(),
+        args.upload_expiry
+            .map_or_else(|| "disabled".to_string(), |v| v.to_string()),
+        args.upload_mimetypes,
+        args.tokens.len()
     );
     axum::serve(tcp_listener, router)
         .with_graceful_shutdown(shutdown_signal())

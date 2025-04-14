@@ -1,6 +1,6 @@
 [package]
 name = "dollhouse"
-description = "A safe & encrypted place to share files"
+description = "Create file share links and embed media on websites."
 repository = "https://github.com/Blooym/dollhouse"
 authors = ["Blooym"]
 version = "0.1.0"
@@ -14,7 +14,7 @@ codegen-units = 1
 lto = true
 
 [dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 axum = { version = "0.8.3", features = ["http2", "macros", "multipart"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
 blake3 = { version = "1.8.1", features = ["zeroize", "rayon"] }
