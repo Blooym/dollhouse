@@ -1,7 +1,8 @@
 use crate::cryptography::Cryptography;
 use anyhow::Result;
 use std::{
-    fs::{self},
+    fs::{self, File, FileTimes},
+    io::Read,
     path::PathBuf,
     time::{Duration, SystemTime},
 };
@@ -42,7 +43,21 @@ impl StorageProvider {
 
     pub fn get_file(&self, filename: &str, key: &str) -> Result<Vec<u8>> {
         debug!("Decrypting and fetching {filename} from storage");
-        Cryptography::decrypt(&fs::read(self.base_path.join(filename))?, key)
+        let file_path = self.base_path.join(filename);
+
+        // Update access time.
+        let metadata = fs::metadata(&file_path)?;
+        let mut file = File::options().read(true).write(true).open(&file_path)?;
+        file.set_times(
+            FileTimes::new()
+                .set_accessed(SystemTime::now())
+                .set_modified(metadata.modified()?),
+        )?;
+
+        // Read and decrypt.
+        let mut buf = Vec::with_capacity(metadata.len() as usize);
+        file.read_to_end(&mut buf)?;
+        Cryptography::decrypt(&buf, key)
     }
 
     pub fn save_file(&self, filename: &str, bytes: &[u8]) -> Result<String> {
