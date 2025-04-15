@@ -55,7 +55,7 @@ impl StorageProvider {
         )?;
 
         // Read and decrypt.
-        let mut buf = Vec::with_capacity(metadata.len() as usize);
+        let mut buf = Vec::new();
         file.read_to_end(&mut buf)?;
         Cryptography::decrypt(&buf, key)
     }
