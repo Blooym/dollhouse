@@ -48,11 +48,11 @@ impl StorageProvider {
         // Update access time.
         let metadata = fs::metadata(&file_path)?;
         let mut file = File::options().read(true).write(true).open(&file_path)?;
-        file.set_times(
+        let _ = file.set_times(
             FileTimes::new()
                 .set_accessed(SystemTime::now())
                 .set_modified(metadata.modified()?),
-        )?;
+        );
 
         // Read and decrypt.
         let mut buf = Vec::new();
