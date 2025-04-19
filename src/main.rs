@@ -26,9 +26,9 @@ use tokio::{net::TcpListener, signal};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     normalize_path::NormalizePathLayer,
-    trace::{self, TraceLayer},
+    trace::{DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
-use tracing::{Level, debug, info};
+use tracing::{Level, debug, info, info_span};
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -197,8 +197,23 @@ async fn main() -> Result<()> {
         )
         .layer(
             TraceLayer::new_for_http()
-                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
-                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+                .make_span_with(|request: &Request<_>| {
+                    let uri = request.uri().to_string();
+                    let path_without_query = if let Some(query_start) = uri.find('?') {
+                        &uri[..query_start]
+                    } else {
+                        &uri
+                    };
+                    info_span!(
+                        "request",
+                        method = ?request.method(),
+                        path = path_without_query,
+                        version = ?request.version(),
+                    )
+                })
+                .on_request(DefaultOnRequest::default())
+                .on_response(DefaultOnResponse::default().level(Level::INFO))
+                .on_failure(DefaultOnFailure::default()),
         )
         .layer(NormalizePathLayer::trim_trailing_slash())
         .layer(CatchPanicLayer::new())
