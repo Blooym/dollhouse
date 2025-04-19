@@ -40,7 +40,10 @@ pub async fn get_upload_handler(
                         .first_or_octet_stream()
                         .essence_str(),
                 ),
-                (header::CACHE_CONTROL, "private"),
+                (
+                    header::CACHE_CONTROL,
+                    "private, max-age=600, must-revalidate",
+                ),
             ],
             (bytes),
         )
