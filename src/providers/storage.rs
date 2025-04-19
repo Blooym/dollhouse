@@ -57,12 +57,12 @@ impl StorageProvider {
         // Read and decrypt.
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)?;
-        Cryptography::decrypt(&buf, key)
+        Cryptography::decrypt(&buf, key, filename.as_bytes())
     }
 
     pub fn save_file(&self, filename: &str, bytes: &[u8]) -> Result<String> {
         debug!("Encrypting and saving {filename} to storage");
-        let (key, bytes) = Cryptography::encrypt(bytes)?;
+        let (key, bytes) = Cryptography::encrypt(bytes, filename.as_bytes())?;
         fs::write(self.base_path.join(filename), bytes)?;
         Ok(key)
     }

@@ -13,7 +13,6 @@ use std::str::FromStr;
 use tracing::error;
 
 const FALLBACK_ENABLED_MIME: Mime = STAR_STAR;
-const FALLBACK_MIME_TYPE: Mime = APPLICATION_OCTET_STREAM;
 const FALLBACK_FILE_EXTENSION: &str = "unknown";
 
 #[derive(Serialize)]
@@ -46,24 +45,24 @@ pub async fn create_upload_handler(
     };
 
     // Infer mimetype by magic numbers and reject
-    let Ok((infer_str, infer_ext)) = infer::get(&data).map_or_else(
-        || {
-            // If wildcard mime is enabled, we can fallback to octet stream.
+    let (infer_str, infer_ext) = match infer::get(&data) {
+        Some(f) => (f.mime_type(), f.extension()),
+        None => {
             if state
                 .upload_allowed_mimetypes
                 .contains(&FALLBACK_ENABLED_MIME)
             {
-                Ok((FALLBACK_MIME_TYPE.essence_str(), FALLBACK_FILE_EXTENSION))
+                (
+                    APPLICATION_OCTET_STREAM.essence_str(),
+                    FALLBACK_FILE_EXTENSION,
+                )
             } else {
-                Err(())
+                return Err((
+                    StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                    "Your file was rejected because the MIME type could not be determined.",
+                ));
             }
-        },
-        |f| Ok((f.mime_type(), f.extension())),
-    ) else {
-        return Err((
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "Your file was rejected because the MIME type could not be determined.",
-        ));
+        }
     };
 
     if !mime::is_mime_allowed(
@@ -88,7 +87,7 @@ pub async fn create_upload_handler(
 
     match state.storage_provider.save_file(&filename, &data) {
         Ok(decryption_key) => Ok(Json(CreateUploadResponse {
-            mimetype: infer_ext,
+            mimetype: infer_str,
             url: format!(
                 "{}://{}/upload/{}?key={}",
                 state.public_base_url.scheme(),
@@ -99,8 +98,8 @@ pub async fn create_upload_handler(
                 filename,
                 decryption_key
             ),
-            key: decryption_key,
             id: filename,
+            key: decryption_key,
         })),
         Err(err) => {
             error!("Error while encrypting or writing file {filename}: {err:?}");

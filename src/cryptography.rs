@@ -1,16 +1,17 @@
 use anyhow::{Result, bail};
+use base64ct::Encoding;
 use blake3::Hasher;
 use chacha20poly1305::{
     AeadCore, KeyInit,
     aead::{Aead, OsRng, generic_array::typenum::Unsigned},
 };
-use hex::ToHex;
 use rand::distr::{Alphanumeric, SampleString};
 use std::{fs, path::PathBuf};
 
 type CryptoImpl = chacha20poly1305::ChaCha20Poly1305;
+type CryptoPayload<'a> = chacha20poly1305::aead::Payload<'a, 'a>;
 type CryptoNonce = chacha20poly1305::Nonce;
-type CryptoNonceSize = <CryptoImpl as AeadCore>::NonceSize;
+const CRYPTO_NONCE_SIZE: usize = <CryptoImpl as AeadCore>::NonceSize::USIZE;
 
 #[derive(Debug)]
 pub struct Cryptography;
@@ -19,29 +20,38 @@ impl Cryptography {
     /// Encrypt a byte array using a random key & nonce.
     ///
     /// Upon success the decryption key and the encrypted bytes are provided.
-    pub fn encrypt(bytes: &[u8]) -> Result<(String, Vec<u8>)> {
+    pub fn encrypt(bytes: &[u8], aad: &[u8]) -> Result<(String, Vec<u8>)> {
         let key = CryptoImpl::generate_key(&mut OsRng);
         let nonce = CryptoImpl::generate_nonce(&mut OsRng);
         let cipher = CryptoImpl::new(&key);
-        let mut ciphered_bytes = match cipher.encrypt(&nonce, bytes) {
+        let mut ciphered_bytes = match cipher.encrypt(&nonce, CryptoPayload { msg: bytes, aad }) {
             Ok(b) => b,
             Err(err) => {
                 bail!("{err:?}");
             }
         };
         ciphered_bytes.splice(..0, nonce.iter().copied());
-        Ok((key.encode_hex_upper(), ciphered_bytes))
+        Ok((
+            base64ct::Base64UrlUnpadded::encode_string(&key),
+            ciphered_bytes,
+        ))
     }
 
     /// Decrypt a byte array with its decryption key.
     ///
     /// # Notes
     /// Should only be used on values encrypted by [`Cryptography::encrypt`].
-    pub fn decrypt(bytes: &[u8], key: &str) -> Result<Vec<u8>> {
-        let (nonce, encrypted_bytes) = bytes.split_at(CryptoNonceSize::to_usize());
-        let key = hex::decode(key)?;
+    pub fn decrypt(bytes: &[u8], key: &str, aad: &[u8]) -> Result<Vec<u8>> {
+        let (nonce, encrypted_bytes) = bytes.split_at(CRYPTO_NONCE_SIZE);
+        let key = base64ct::Base64UrlUnpadded::decode_vec(key)?;
         let cipher = CryptoImpl::new_from_slice(&key)?;
-        match cipher.decrypt(CryptoNonce::from_slice(nonce), encrypted_bytes) {
+        match cipher.decrypt(
+            CryptoNonce::from_slice(nonce),
+            CryptoPayload {
+                msg: encrypted_bytes,
+                aad,
+            },
+        ) {
             Ok(data) => Ok(data),
             Err(err) => bail!(err),
         }
