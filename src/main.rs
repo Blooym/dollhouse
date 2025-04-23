@@ -91,7 +91,7 @@ struct Arguments {
     /// Supports type wildcards (e.g. 'image/*', '*/*').
     ///
     /// MIME types are determined by the magic numbers of uploaded content, if the mimetype cannot be determined the server will either:
-    ///     - Fallback to `application/octet-stream` with a `.unknown` extension if all mimetypes are allowed (using `*/*`).
+    ///     - Fallback to `application/octet-stream if all mimetypes are allowed (using `*/*`).
     ///     - Reject the upload with an error informing the uploader the mime type could not be determined.
     #[clap(
         long = "upload-mimetypes",
@@ -188,7 +188,7 @@ async fn main() -> Result<()> {
         )
         .route(
             "/upload/{id}",
-            delete(routes::uploads::delete_image_handler).layer(
+            delete(routes::uploads::delete_upload_handler).layer(
                 axum_middleware::from_fn_with_state(
                     state.clone(),
                     AuthProvider::valid_auth_middleware,

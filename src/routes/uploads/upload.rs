@@ -13,7 +13,6 @@ use std::str::FromStr;
 use tracing::error;
 
 const FALLBACK_ENABLED_MIME: Mime = STAR_STAR;
-const FALLBACK_FILE_EXTENSION: &str = "unknown";
 
 #[derive(Serialize)]
 pub struct CreateUploadResponse {
@@ -52,10 +51,7 @@ pub async fn create_upload_handler(
                 .upload_allowed_mimetypes
                 .contains(&FALLBACK_ENABLED_MIME)
             {
-                (
-                    APPLICATION_OCTET_STREAM.essence_str(),
-                    FALLBACK_FILE_EXTENSION,
-                )
+                (APPLICATION_OCTET_STREAM.essence_str(), "")
             } else {
                 return Err((
                     StatusCode::UNSUPPORTED_MEDIA_TYPE,
@@ -77,11 +73,12 @@ pub async fn create_upload_handler(
 
     // Store file by hash to prevent duplicating uploads.
     let filename = format!(
-        "{}.{}",
+        "{}{}{}",
         Cryptography::hash_bytes(&data, &state.persisted_salt)
             .unwrap()
             .get(..10)
             .unwrap(),
+        if !infer_ext.is_empty() { "." } else { "" },
         infer_ext
     );
 

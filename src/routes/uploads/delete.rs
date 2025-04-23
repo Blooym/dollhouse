@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
 };
 
-pub async fn delete_image_handler(
+pub async fn delete_upload_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> StatusCode {
