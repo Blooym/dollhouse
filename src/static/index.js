@@ -14,13 +14,13 @@ function setStoredToken() {
 }
 
 const errorText = document.getElementById("error");
-const imageUploadForm = document.getElementById("imageUploadForm");
+const fileUploadForm = document.getElementById("fileUploadForm");
 
 let token = getStoredToken();
 if (token) {
     getTokenInput().value = token;
 }
-imageUploadForm.addEventListener("submit", uploadFile);
+fileUploadForm.addEventListener("submit", uploadFile);
 
 // File upload handler.
 async function uploadFile(event) {
@@ -56,11 +56,24 @@ async function uploadFile(event) {
         const json = await res.json();
         const redirectUrl = json["url"];
         if (redirectUrl === undefined || redirectUrl === null) {
-            throw new Error("server returned malformed response object\nyour token may be invalid.");
+            throw new Error("server returned malformed response object");
         }
-        window.location = json["url"];
         fileUploadButton.innerText = oldUploadText;
         fileUploadButton.disabled = false;
+        fileInput.value = null;
+
+        if (!navigator.share) {
+            await navigator.clipboard.writeText(redirectUrl);
+            alert("Upload url copied to clipboard")
+        } else {
+            try {
+                await navigator.share({
+                    title: "Share this upload",
+                    url: redirectUrl
+                });
+            } catch { }
+        }
+
     } catch (e) {
         fileUploadButton.innerText = oldUploadText;
         fileUploadButton.disabled = false;
