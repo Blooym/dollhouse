@@ -165,7 +165,7 @@ impl FromStr for StorageProvider {
                 if valid_sources.is_empty() {
                     Err("No storage backends are enabled".to_string())
                 } else {
-                    Err(format!("Valid sources are: {}", valid_sources.join(" / ")))
+                    Err(format!("Valid sources are: {}", valid_sources.join(", ")))
                 }
             }
         }
