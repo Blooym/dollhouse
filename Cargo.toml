@@ -14,10 +14,10 @@ codegen-units = 1
 lto = true
 
 [features]
-default = ["storage_filesystem", "storage_memory", "storage_s3"]
-storage_memory = ["dep:dashmap"]
-storage_filesystem = ["dep:faccess"]
-storage_s3 = ["dep:aws-config", "dep:aws-sdk-s3"]
+default = ["storage-filesystem", "storage-memory", "storage-s3"]
+storage-memory = ["dep:dashmap"]
+storage-filesystem = ["dep:faccess"]
+storage-s3 = ["dep:aws-config", "dep:aws-sdk-s3"]
 
 [dependencies]
 anyhow = "1.0.98"

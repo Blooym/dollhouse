@@ -22,22 +22,22 @@ pub trait StorageOperations: StorageCapabilities {
 
 #[derive(Debug, Clone)]
 pub enum StorageProvider {
-    #[cfg(feature = "storage_memory")]
+    #[cfg(feature = "storage-memory")]
     Memory(backends::MemoryStorage),
-    #[cfg(feature = "storage_filesystem")]
+    #[cfg(feature = "storage-filesystem")]
     Filesystem(backends::FilesystemStorage),
-    #[cfg(feature = "storage_s3")]
+    #[cfg(feature = "storage-s3")]
     S3(backends::S3Storage),
 }
 
 impl StorageCapabilities for StorageProvider {
     fn supports_expiry(&self) -> bool {
         match self {
-            #[cfg(feature = "storage_memory")]
+            #[cfg(feature = "storage-memory")]
             StorageProvider::Memory(storage) => storage.supports_expiry(),
-            #[cfg(feature = "storage_filesystem")]
+            #[cfg(feature = "storage-filesystem")]
             StorageProvider::Filesystem(storage) => storage.supports_expiry(),
-            #[cfg(feature = "storage_s3")]
+            #[cfg(feature = "storage-s3")]
             StorageProvider::S3(storage) => storage.supports_expiry(),
         }
     }
@@ -46,66 +46,66 @@ impl StorageCapabilities for StorageProvider {
 impl StorageOperations for StorageProvider {
     async fn read(&self, path: &Path) -> Result<Option<Vec<u8>>> {
         match self {
-            #[cfg(feature = "storage_memory")]
+            #[cfg(feature = "storage-memory")]
             StorageProvider::Memory(storage) => storage.read(path).await,
-            #[cfg(feature = "storage_filesystem")]
+            #[cfg(feature = "storage-filesystem")]
             StorageProvider::Filesystem(storage) => storage.read(path).await,
-            #[cfg(feature = "storage_s3")]
+            #[cfg(feature = "storage-s3")]
             StorageProvider::S3(storage) => storage.read(path).await,
         }
     }
 
     async fn write(&mut self, path: &Path, data: &[u8]) -> Result<()> {
         match self {
-            #[cfg(feature = "storage_memory")]
+            #[cfg(feature = "storage-memory")]
             StorageProvider::Memory(storage) => storage.write(path, data).await,
-            #[cfg(feature = "storage_filesystem")]
+            #[cfg(feature = "storage-filesystem")]
             StorageProvider::Filesystem(storage) => storage.write(path, data).await,
-            #[cfg(feature = "storage_s3")]
+            #[cfg(feature = "storage-s3")]
             StorageProvider::S3(storage) => storage.write(path, data).await,
         }
     }
 
     async fn delete(&mut self, path: &Path) -> Result<bool> {
         match self {
-            #[cfg(feature = "storage_memory")]
+            #[cfg(feature = "storage-memory")]
             StorageProvider::Memory(storage) => storage.delete(path).await,
-            #[cfg(feature = "storage_filesystem")]
+            #[cfg(feature = "storage-filesystem")]
             StorageProvider::Filesystem(storage) => storage.delete(path).await,
-            #[cfg(feature = "storage_s3")]
+            #[cfg(feature = "storage-s3")]
             StorageProvider::S3(storage) => storage.delete(path).await,
         }
     }
 
     async fn exists(&self, path: &Path) -> Result<bool> {
         match self {
-            #[cfg(feature = "storage_memory")]
+            #[cfg(feature = "storage-memory")]
             StorageProvider::Memory(storage) => storage.exists(path).await,
-            #[cfg(feature = "storage_filesystem")]
+            #[cfg(feature = "storage-filesystem")]
             StorageProvider::Filesystem(storage) => storage.exists(path).await,
-            #[cfg(feature = "storage_s3")]
+            #[cfg(feature = "storage-s3")]
             StorageProvider::S3(storage) => storage.exists(path).await,
         }
     }
 
     async fn list(&self, path: &Path) -> Result<Vec<PathBuf>> {
         match self {
-            #[cfg(feature = "storage_memory")]
+            #[cfg(feature = "storage-memory")]
             StorageProvider::Memory(storage) => storage.list(path).await,
-            #[cfg(feature = "storage_filesystem")]
+            #[cfg(feature = "storage-filesystem")]
             StorageProvider::Filesystem(storage) => storage.list(path).await,
-            #[cfg(feature = "storage_s3")]
+            #[cfg(feature = "storage-s3")]
             StorageProvider::S3(storage) => storage.list(path).await,
         }
     }
 
     async fn last_access(&self, path: &Path) -> Result<Option<SystemTime>> {
         match self {
-            #[cfg(feature = "storage_memory")]
+            #[cfg(feature = "storage-memory")]
             StorageProvider::Memory(storage) => storage.last_access(path).await,
-            #[cfg(feature = "storage_filesystem")]
+            #[cfg(feature = "storage-filesystem")]
             StorageProvider::Filesystem(storage) => storage.last_access(path).await,
-            #[cfg(feature = "storage_s3")]
+            #[cfg(feature = "storage-s3")]
             StorageProvider::S3(storage) => storage.last_access(path).await,
         }
     }
@@ -115,10 +115,10 @@ impl FromStr for StorageProvider {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            #[cfg(feature = "storage_memory")]
+            #[cfg(feature = "storage-memory")]
             "memory://" => Ok(Self::Memory(backends::MemoryStorage::new())),
 
-            #[cfg(feature = "storage_filesystem")]
+            #[cfg(feature = "storage-filesystem")]
             _ if s.starts_with("fs://") => {
                 use faccess::{AccessMode, PathExt};
 
@@ -135,7 +135,7 @@ impl FromStr for StorageProvider {
                 ))
             }
 
-            #[cfg(feature = "storage_s3")]
+            #[cfg(feature = "storage-s3")]
             _ if s.starts_with("s3://") => {
                 let bucket = s
                     .trim_start_matches("s3://")
@@ -155,11 +155,11 @@ impl FromStr for StorageProvider {
 
             _ => {
                 let mut valid_sources = Vec::new();
-                #[cfg(feature = "storage_memory")]
+                #[cfg(feature = "storage-memory")]
                 valid_sources.push("'memory://'");
-                #[cfg(feature = "storage_filesystem")]
+                #[cfg(feature = "storage-filesystem")]
                 valid_sources.push("'fs://path'");
-                #[cfg(feature = "storage_s3")]
+                #[cfg(feature = "storage-s3")]
                 valid_sources.push("'s3://bucket'");
 
                 if valid_sources.is_empty() {
