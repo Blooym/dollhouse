@@ -93,7 +93,7 @@ impl StorageOperations for FilesystemStorage {
     }
 
     async fn delete(&mut self, path: &std::path::Path) -> Result<bool> {
-        let path = self.join_to_base(&path)?;
+        let path = self.join_to_base(path)?;
         debug!("Deleting file at {path:?}");
         match fs::remove_file(path) {
             Ok(_) => Ok(true),
