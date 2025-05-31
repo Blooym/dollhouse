@@ -35,56 +35,45 @@ mod tests {
     #[test]
     fn test_is_mime_allowed() {
         // Test PNG when nothing is allowed.
-        assert!(
-            !super::is_mime_allowed(&Mime::from_str("image/png").unwrap(), &vec![])
-        );
+        assert!(!super::is_mime_allowed(
+            &Mime::from_str("image/png").unwrap(),
+            &vec![]
+        ));
 
         // Test PNG when PNG is allowed.
-        assert!(
-            super::is_mime_allowed(
-                &Mime::from_str("image/png").unwrap(),
-                &vec![mime::IMAGE_PNG],
-            )
-        );
+        assert!(super::is_mime_allowed(
+            &Mime::from_str("image/png").unwrap(),
+            &vec![mime::IMAGE_PNG],
+        ));
 
         // Test PNG when only JPG is allowed.
-        assert!(
-            !super::is_mime_allowed(
-                &Mime::from_str("image/png").unwrap(),
-                &vec![mime::IMAGE_JPEG],
-            )
-        );
+        assert!(!super::is_mime_allowed(
+            &Mime::from_str("image/png").unwrap(),
+            &vec![mime::IMAGE_JPEG],
+        ));
 
         // Test PNG when any image subtype is allowed.
-        assert!(
-            super::is_mime_allowed(
-                &Mime::from_str("image/png").unwrap(),
-                &vec![mime::IMAGE_STAR],
-            )
-        );
+        assert!(super::is_mime_allowed(
+            &Mime::from_str("image/png").unwrap(),
+            &vec![mime::IMAGE_STAR],
+        ));
 
         // Test PNG when anything is allowed.
-        assert!(
-            super::is_mime_allowed(
-                &Mime::from_str("image/png").unwrap(),
-                &vec![mime::STAR_STAR],
-            )
-        );
+        assert!(super::is_mime_allowed(
+            &Mime::from_str("image/png").unwrap(),
+            &vec![mime::STAR_STAR],
+        ));
 
         // Test HTML when any image subtype is enabled.
-        assert!(
-            !super::is_mime_allowed(
-                &Mime::from_str("text/html").unwrap(),
-                &vec![mime::IMAGE_STAR],
-            )
-        );
+        assert!(!super::is_mime_allowed(
+            &Mime::from_str("text/html").unwrap(),
+            &vec![mime::IMAGE_STAR],
+        ));
 
         // Test PNG when images and text are enabled.
-        assert!(
-            super::is_mime_allowed(
-                &Mime::from_str("image/png").unwrap(),
-                &vec![mime::TEXT_STAR, mime::IMAGE_STAR],
-            )
-        );
+        assert!(super::is_mime_allowed(
+            &Mime::from_str("image/png").unwrap(),
+            &vec![mime::TEXT_STAR, mime::IMAGE_STAR],
+        ));
     }
 }
