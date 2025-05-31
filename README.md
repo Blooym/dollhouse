@@ -16,7 +16,7 @@ Server for creating file share links and embedding media on websites. 🎀
 - **Storage-efficiency**: Uploads are deduplicated by storing them as a hash of their contents; Hashes are then salted with a persistent key generated on first-time startup.
 
 - **Encrypted at rest**: All uploads are encrypted by the server when stored. The decryption key is attached to the returned share url and is not kept by the server. No upload can be accessed without the decryption key, even with access to the filesystem.
-  - Note: encyption and decryption are handled server-side, anybody with access to the server network could intercept data unencrypted or decryption keys from logs. This is intentional as it allows uploads to embed on all websites. 
+  - Note: encyption and decryption are handled server-side, anybody with access to the server network could intercept data unencrypted or decryption keys from logs. While an unfortunate drawback, this is an accepted flaw as it allows uploads from clients that may otherwise be unable to encrypt before upload. 
 
 ## Setup
 
