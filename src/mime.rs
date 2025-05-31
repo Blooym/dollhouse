@@ -35,63 +35,56 @@ mod tests {
     #[test]
     fn test_is_mime_allowed() {
         // Test PNG when nothing is allowed.
-        assert_eq!(
-            super::is_mime_allowed(&Mime::from_str("image/png").unwrap(), &vec![]),
-            false
+        assert!(
+            !super::is_mime_allowed(&Mime::from_str("image/png").unwrap(), &vec![])
         );
 
         // Test PNG when PNG is allowed.
-        assert_eq!(
+        assert!(
             super::is_mime_allowed(
                 &Mime::from_str("image/png").unwrap(),
                 &vec![mime::IMAGE_PNG],
-            ),
-            true
+            )
         );
 
         // Test PNG when only JPG is allowed.
-        assert_eq!(
-            super::is_mime_allowed(
+        assert!(
+            !super::is_mime_allowed(
                 &Mime::from_str("image/png").unwrap(),
                 &vec![mime::IMAGE_JPEG],
-            ),
-            false
+            )
         );
 
         // Test PNG when any image subtype is allowed.
-        assert_eq!(
+        assert!(
             super::is_mime_allowed(
                 &Mime::from_str("image/png").unwrap(),
                 &vec![mime::IMAGE_STAR],
-            ),
-            true
+            )
         );
 
         // Test PNG when anything is allowed.
-        assert_eq!(
+        assert!(
             super::is_mime_allowed(
                 &Mime::from_str("image/png").unwrap(),
                 &vec![mime::STAR_STAR],
-            ),
-            true
+            )
         );
 
         // Test HTML when any image subtype is enabled.
-        assert_eq!(
-            super::is_mime_allowed(
+        assert!(
+            !super::is_mime_allowed(
                 &Mime::from_str("text/html").unwrap(),
                 &vec![mime::IMAGE_STAR],
-            ),
-            false
+            )
         );
 
         // Test PNG when images and text are enabled.
-        assert_eq!(
+        assert!(
             super::is_mime_allowed(
                 &Mime::from_str("image/png").unwrap(),
                 &vec![mime::TEXT_STAR, mime::IMAGE_STAR],
-            ),
-            true
+            )
         );
     }
 }

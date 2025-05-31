@@ -1,9 +1,11 @@
+mod auth;
 mod cryptography;
 mod mime;
-mod providers;
 mod routes;
+mod storage;
 
 use anyhow::{Context, Result};
+use auth::AuthProvider;
 use axum::{
     Router,
     extract::{DefaultBodyLimit, Request},
@@ -15,25 +17,20 @@ use axum::{
 use bytesize::ByteSize;
 use clap::Parser;
 use clap_duration::duration_range_value_parse;
-use cryptography::Cryptography;
 use dotenvy::dotenv;
 use duration_human::{DurationHuman, DurationHumanValidator};
 use mime_guess::{Mime, mime::IMAGE_STAR};
-use providers::auth::AuthProvider;
-use providers::storage::StorageProvider;
-use std::{net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
-use tokio::{net::TcpListener, signal};
+use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
+use storage::{AppStorage, StorageProvider};
+use tokio::{net::TcpListener, signal, sync::RwLock};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     normalize_path::NormalizePathLayer,
     trace::{DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
-use tracing::{Level, debug, info, info_span};
+use tracing::{Level, debug, info, info_span, warn};
 use tracing_subscriber::EnvFilter;
 use url::Url;
-
-const UPLOADS_DIRNAME: &str = "uploads";
-const PERSISTED_SALT_FILENAME: &str = "persisted_salt";
 
 #[derive(Debug, Clone, Parser)]
 #[clap(author, about, version)]
@@ -65,15 +62,17 @@ struct Arguments {
     )]
     tokens: Vec<String>,
 
-    /// Path to the directory where data should be stored.
+    /// The storage provider to use for all persistent data.
     ///
-    /// CAUTION: This directory should not be used for anything else as it and all subdirectories will be automatically managed.
-    #[clap(
-        long = "data-path", 
-        env = "DOLLHOUSE_DATA_PATH",
-        default_value = dirs::data_local_dir().unwrap().join("dollhouse").into_os_string()
-    )]
-    data_path: PathBuf,
+    /// Available options depend on what was enabled at compile time, a full list of providers is below.
+    ///
+    /// Providers: `memory://`, `fs://<path>`, `s3://bucket`
+    #[arg(long = "storage", env = "DOLLHOUSE_STORAGE_PROVIDER")]
+    storage: StorageProvider,
+
+    /// A unique secret to use for file hashing operations.
+    #[clap(long = "app-secret", env = "DOLLHOUSE_APP_SECRET")]
+    app_secret: String,
 
     /// Time since since last access before a file is automatically purged from storage.
     #[clap(long = "upload-expiry", env = "DOLLHOUSE_UPLOAD_EXPIRY", value_parser = duration_range_value_parse!(min: 1min, max: 100years))]
@@ -105,9 +104,9 @@ struct Arguments {
     upload_mimetypes: Vec<Mime>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct AppState {
-    storage_provider: Arc<StorageProvider>,
+    storage: Arc<RwLock<AppStorage>>,
     auth_provider: Arc<AuthProvider>,
     public_base_url: Url,
     upload_allowed_mimetypes: Vec<Mime>,
@@ -123,36 +122,14 @@ async fn main() -> Result<()> {
     let args = Arguments::parse();
 
     // Init required state.
-    let storage = Arc::new(StorageProvider::new(args.data_path.join(UPLOADS_DIRNAME))?);
-    let persisted_salt = {
-        let path = args.data_path.join(PERSISTED_SALT_FILENAME);
-        if let Some(salt) = Cryptography::get_persisted_salt(&path)? {
-            salt
-        } else {
-            Cryptography::create_persisted_salt(&path)?
-        }
-    };
+    let storage = Arc::new(RwLock::new(AppStorage::new(args.storage)));
     let state = AppState {
-        storage_provider: Arc::clone(&storage),
+        storage: Arc::clone(&storage),
         auth_provider: Arc::new(AuthProvider::new(args.tokens.clone())),
         public_base_url: args.public_url.clone(),
         upload_allowed_mimetypes: args.upload_mimetypes.clone(),
-        persisted_salt,
+        persisted_salt: args.app_secret,
     };
-
-    // Background task for expiring files.
-    if let Some(expire_after) = args.upload_expiry.map(|e| Duration::from(&e)) {
-        let storage_clone = Arc::clone(&storage);
-        tokio::spawn(async move {
-            loop {
-                debug!("Running file expiry check");
-                storage_clone
-                    .remove_all_expired_files(expire_after)
-                    .unwrap();
-                tokio::time::sleep(Duration::from_secs(60)).await;
-            }
-        });
-    }
 
     // Start server.
     let tcp_listener = TcpListener::bind(args.address).await?;
@@ -162,13 +139,6 @@ async fn main() -> Result<()> {
         .route("/index.js", get(routes::index_js_handler))
         .route("/favicon.ico", get(routes::favicon_handler))
         .route("/health", get(routes::health_handler))
-        .route(
-            "/statistics",
-            get(routes::statistics_handler).layer(axum_middleware::from_fn_with_state(
-                state.clone(),
-                AuthProvider::valid_auth_middleware,
-            )),
-        )
         .route("/upload/{id}", get(routes::uploads::get_upload_handler))
         .route(
             "/upload",
@@ -230,24 +200,52 @@ async fn main() -> Result<()> {
             },
         ))
         .with_state(state);
+
+    // Background task for expiring files.
+    let using_upload_expiry = if let Some(expire_after) =
+        args.upload_expiry.map(|e| Duration::from(&e))
+    {
+        if !storage.read().await.provider_supports_expiry() {
+            warn!(
+                "The storage provider you are using does not support expiry - uploads will not be automatically removed."
+            );
+            None
+        } else {
+            let storage_clone = Arc::clone(&storage);
+            tokio::spawn(async move {
+                loop {
+                    debug!("Running upload expiry check");
+                    storage_clone
+                        .write()
+                        .await
+                        .remove_all_expired_uploads(expire_after)
+                        .await
+                        .unwrap();
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                }
+            });
+            args.upload_expiry
+        }
+    } else {
+        None
+    };
+
     info!(
         "Internal server started\n\
          * Listening on: http://{}\n\
          * Public URL: {}\n\
-         * Data path: {:?}\n\
          * Upload size limit: {}\n\
          * Upload expiry: {}\n\
          * Allowed mimetypes: {:?}\n\
          * Tokens configured: {}",
         args.address,
         args.public_url,
-        args.data_path,
         args.upload_size_limit.display().si(),
-        args.upload_expiry
-            .map_or_else(|| "disabled".to_string(), |v| v.to_string()),
+        using_upload_expiry.map_or_else(|| "disabled".to_string(), |v| v.to_string()),
         args.upload_mimetypes,
         args.tokens.len()
     );
+
     axum::serve(tcp_listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;

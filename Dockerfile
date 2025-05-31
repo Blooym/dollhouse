@@ -39,7 +39,7 @@ COPY --from=user --chown=dollhouse /dir /srv/dollhouse
 
 ENV DOLLHOUSE_ADDRESS=0.0.0.0:8731
 ENV DOLLHOUSE_PUBLIC_URL=http://0.0.0.0:8731
-ENV DOLLHOUSE_DATA_PATH=/srv/dollhouse
+ENV DOLLHOUSE_STORAGE_PROVIDER=fs:///srv/dollhouse
 ENV RUST_LOG=info
 EXPOSE 8731
 

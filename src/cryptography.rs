@@ -5,8 +5,6 @@ use chacha20poly1305::{
     AeadCore, KeyInit,
     aead::{Aead, OsRng, generic_array::typenum::Unsigned},
 };
-use rand::distr::{Alphanumeric, SampleString};
-use std::{fs, path::PathBuf};
 
 type CryptoImpl = chacha20poly1305::ChaCha20Poly1305;
 type CryptoPayload<'a> = chacha20poly1305::aead::Payload<'a, 'a>;
@@ -73,24 +71,5 @@ impl Cryptography {
 
         hasher.update(salt.as_bytes());
         Ok(hasher.finalize().to_hex().to_string())
-    }
-
-    /// Retrieve a saved salt string from the given path.
-    pub fn get_persisted_salt(path: &PathBuf) -> Result<Option<String>> {
-        // Check for existing salt.
-        if fs::exists(path)? {
-            let data = fs::read_to_string(path)?;
-            if !data.trim().is_empty() {
-                return Ok(Some(data));
-            }
-        }
-        Ok(None)
-    }
-
-    // Generate and save a persisted salt value at the given path.
-    pub fn create_persisted_salt(path: &PathBuf) -> Result<String> {
-        let salt = Alphanumeric.sample_string(&mut rand::rng(), 64);
-        fs::write(path, &salt)?;
-        Ok(salt)
     }
 }

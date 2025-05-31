@@ -8,10 +8,15 @@ pub async fn delete_upload_handler(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> StatusCode {
-    if !state.storage_provider.file_exists(&id).unwrap() {
+    if !state.storage.read().await.upload_exists(&id).await.unwrap() {
         return StatusCode::NOT_FOUND;
     }
-
-    state.storage_provider.delete_file(&id).unwrap();
+    state
+        .storage
+        .write()
+        .await
+        .delete_upload(&id)
+        .await
+        .unwrap();
     StatusCode::OK
 }

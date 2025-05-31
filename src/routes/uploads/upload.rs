@@ -82,7 +82,13 @@ pub async fn create_upload_handler(
         infer_ext
     );
 
-    match state.storage_provider.save_file(&filename, &data) {
+    match state
+        .storage
+        .write()
+        .await
+        .save_upload(&filename, &data)
+        .await
+    {
         Ok(decryption_key) => Ok(Json(CreateUploadResponse {
             mimetype: infer_str,
             url: format!(

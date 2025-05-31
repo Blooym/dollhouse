@@ -27,11 +27,14 @@ pub async fn get_upload_handler(
     Path(id): Path<String>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
+    let storage = state.storage.read().await;
+
     // Don't bother trying to decrypt if we know the file doesn't exist.
-    if !state.storage_provider.file_exists(&id).unwrap() {
+    if !storage.upload_exists(&id).await.unwrap() {
         return DECRYPT_OR_NOT_FOUND_RESPONSE.into_response();
     }
-    match state.storage_provider.get_file(&id, &query.key) {
+
+    match storage.get_upload(&id, &query.key).await {
         Ok(bytes) => (
             [
                 (
