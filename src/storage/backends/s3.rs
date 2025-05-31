@@ -19,7 +19,9 @@ impl S3Storage {
                 let config = aws_config::from_env().load().await;
                 let client = Client::new(&config);
                 if let Err(err) = client.head_bucket().bucket(&bucket_clone).send().await {
-                    if err.as_service_error().unwrap().is_not_found() {
+                    if err.as_service_error().is_some()
+                        && err.as_service_error().unwrap().is_not_found()
+                    {
                         client
                             .create_bucket()
                             .bucket(&bucket_clone)
@@ -27,14 +29,14 @@ impl S3Storage {
                             .await
                             .unwrap();
                     } else {
-                        panic!("Error while initialing S3 bucket for storage: {err:?}");
+                        bail!("Error while initialing S3 bucket for storage: {err:?}");
                     }
                 }
                 debug!(
                     "Initialised S3 client with endpoint {:?}",
                     config.endpoint_url()
                 );
-                client
+                Ok(client)
             })
         })
         .join()
@@ -43,7 +45,7 @@ impl S3Storage {
             Err(panic_err) => {
                 return Err(anyhow!("S3 client creation thread error: {:?}", panic_err));
             }
-        };
+        }?;
 
         Ok(Self { client, bucket })
     }
