@@ -1,7 +1,7 @@
 # ----------
-#    USER
+#   SETUP
 # ----------
-FROM alpine:latest AS user
+FROM alpine:latest AS setup
 RUN adduser -S -s /bin/false -D dollhouse
 RUN mkdir /dir
 
@@ -26,17 +26,19 @@ RUN cargo build --release
 # -----------
 #   RUNTIME
 # -----------
-FROM scratch AS runtime
+FROM scratch
 WORKDIR /opt
 
 COPY --from=build /build/target/release/dollhouse /usr/bin/dollhouse
 
-# Import and switch to non-root user.
-COPY --from=user /etc/passwd /etc/passwd
-COPY --from=user /bin/false /bin/false
+# Setup deployment image.
+COPY --from=setup /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=setup /etc/passwd /etc/passwd
+COPY --from=setup /bin/false /bin/false
 USER dollhouse
-COPY --from=user --chown=dollhouse /dir /srv/dollhouse
+COPY --from=setup --chown=dollhouse /dir /srv/dollhouse
 
+# Set configuration defaults for container builds.
 ENV DOLLHOUSE_ADDRESS=0.0.0.0:8731
 ENV DOLLHOUSE_PUBLIC_URL=http://0.0.0.0:8731
 ENV DOLLHOUSE_STORAGE_PROVIDER=fs:///srv/dollhouse
