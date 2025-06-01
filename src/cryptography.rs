@@ -6,9 +6,9 @@ use chacha20poly1305::{
     aead::{Aead, OsRng, generic_array::typenum::Unsigned},
 };
 
-type CryptoImpl = chacha20poly1305::ChaCha20Poly1305;
+type CryptoImpl = chacha20poly1305::XChaCha20Poly1305;
 type CryptoPayload<'a> = chacha20poly1305::aead::Payload<'a, 'a>;
-type CryptoNonce = chacha20poly1305::Nonce;
+type CryptoNonce = chacha20poly1305::XNonce;
 const CRYPTO_NONCE_SIZE: usize = <CryptoImpl as AeadCore>::NonceSize::USIZE;
 
 #[derive(Debug)]
