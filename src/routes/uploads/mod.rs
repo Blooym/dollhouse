@@ -1,6 +1,6 @@
 mod delete;
 mod get;
-mod upload;
+mod post;
 pub use delete::*;
 pub use get::*;
-pub use upload::*;
+pub use post::*;

@@ -75,7 +75,7 @@ struct Arguments {
     app_secret: String,
 
     /// Time since since last access before a file is automatically purged from storage.
-    #[clap(long = "upload-expiry", env = "DOLLHOUSE_UPLOAD_EXPIRY", value_parser = duration_range_value_parse!(min: 1min, max: 100years))]
+    #[clap(long = "upload-expiry", env = "DOLLHOUSE_UPLOAD_EXPIRY", value_parser = duration_range_value_parse!(min: 30min, max: 100years))]
     upload_expiry: Option<DurationHuman>,
 
     /// Maximum file size that can be uploaded.
