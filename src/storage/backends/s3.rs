@@ -19,9 +19,7 @@ impl S3Storage {
                 let config = aws_config::from_env().load().await;
                 let client = Client::new(&config);
                 if let Err(err) = client.head_bucket().bucket(&bucket_clone).send().await {
-                    if err.as_service_error().is_some()
-                        && err.as_service_error().unwrap().is_not_found()
-                    {
+                    if err.as_service_error().map(|e| e.is_not_found()) == Some(true) {
                         client
                             .create_bucket()
                             .bucket(&bucket_clone)
@@ -73,7 +71,7 @@ impl StorageOperations for S3Storage {
                 Ok(Some(data))
             }
             Err(err) => {
-                if err.as_service_error().unwrap().is_no_such_key() {
+                if err.as_service_error().map(|e| e.is_no_such_key()) == Some(true) {
                     Ok(None)
                 } else {
                     Err(err.into())
@@ -120,7 +118,7 @@ impl StorageOperations for S3Storage {
         {
             Ok(_) => Ok(true),
             Err(err) => {
-                if err.as_service_error().unwrap().is_not_found() {
+                if err.as_service_error().map(|e| e.is_not_found()) == Some(true) {
                     Ok(false)
                 } else {
                     Err(err.into())
@@ -175,7 +173,7 @@ impl StorageOperations for S3Storage {
         //         }
         //     }
         //     Err(err) => {
-        //         if err.as_service_error().unwrap().is_not_found() {
+        //         if err.as_service_error().map(|e| e.is_not_found()) == Some(true) {
         //             Ok(None)
         //         } else {
         //             Err(err.into())
