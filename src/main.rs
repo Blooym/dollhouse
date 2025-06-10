@@ -241,7 +241,7 @@ async fn main() -> Result<()> {
         args.address,
         args.public_url,
         args.upload_size_limit.display().si(),
-        using_upload_expiry.map_or_else(|| "disabled".to_string(), |v| v.to_string()),
+        using_upload_expiry.map_or_else(|| "disabled".to_string(), |v| format!("{v:#}")),
         args.upload_mimetypes,
         args.tokens.len()
     );
