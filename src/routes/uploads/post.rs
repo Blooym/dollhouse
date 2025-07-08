@@ -8,6 +8,7 @@ use mime_guess::{
     Mime,
     mime::{APPLICATION_OCTET_STREAM, STAR_STAR},
 };
+use rand::seq::IndexedRandom;
 use serde::Serialize;
 use std::str::FromStr;
 use tracing::error;
@@ -82,6 +83,14 @@ pub async fn create_upload_handler(
         infer_ext
     );
 
+    // rand url
+    let url = state.public_base_urls.choose(&mut rand::rng()).unwrap_or(
+        state
+            .public_base_urls
+            .first()
+            .expect("At least one public URL should be set"),
+    );
+
     match state
         .storage
         .write()
@@ -93,11 +102,13 @@ pub async fn create_upload_handler(
             mimetype: infer_str,
             url: format!(
                 "{}://{}/upload/{}?key={}",
-                state.public_base_url.scheme(),
-                state.public_base_url.port().map_or(
-                    state.public_base_url.host_str().unwrap().to_string(),
-                    |f| format!("{}:{}", state.public_base_url.host_str().unwrap(), f,)
-                ),
+                url.scheme(),
+                url.port()
+                    .map_or(url.host_str().unwrap().to_string(), |f| format!(
+                        "{}:{}",
+                        url.host_str().unwrap(),
+                        f,
+                    )),
                 filename,
                 decryption_key
             ),
