@@ -28,14 +28,14 @@ impl FilesystemStorage {
                 std::path::Component::Prefix(_) | std::path::Component::RootDir => {
                     return Err(io::Error::new(
                         io::ErrorKind::PermissionDenied,
-                        format!("Absolute paths are not allowed: {:?}", path),
+                        format!("Absolute paths are not allowed: {path:?}"),
                     )
                     .into());
                 }
                 std::path::Component::ParentDir => {
                     return Err(io::Error::new(
                         io::ErrorKind::PermissionDenied,
-                        format!("Paths cannot reference a parent directory: {:?}", path),
+                        format!("Paths cannot reference a parent directory: {path:?}"),
                     )
                     .into());
                 }
