@@ -83,13 +83,10 @@ pub async fn create_upload_handler(
         infer_ext
     );
 
-    // rand url
-    let url = state.public_base_urls.choose(&mut rand::rng()).unwrap_or(
-        state
-            .public_base_urls
-            .first()
-            .expect("At least one public URL should be set"),
-    );
+    let url = state.public_base_urls.choose(&mut rand::rng()).ok_or((
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "No public base URL configured.",
+    ))?;
 
     match state
         .storage
