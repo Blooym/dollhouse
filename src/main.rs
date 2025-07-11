@@ -50,7 +50,6 @@ struct Arguments {
         long = "public-urls",
         env = "DOLLHOUSE_PUBLIC_URLS",
         default_value = "http://127.0.0.1:8731",
-        required = true,
         value_delimiter = ','
     )]
     public_url: Vec<Url>,
