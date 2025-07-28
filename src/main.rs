@@ -234,13 +234,17 @@ async fn main() -> Result<()> {
     info!(
         "Internal server started\n\
          * Listening on: http://{}\n\
-         * Public URLs: {:#?}\n\
+         * Public URLs: {}\n\
          * Upload size limit: {}\n\
          * Upload expiry: {}\n\
          * Allowed mimetypes: {:?}\n\
          * Tokens configured: {}",
         args.address,
-        args.public_url,
+        args.public_url
+            .iter()
+            .map(|url| url.as_str())
+            .collect::<Vec<_>>()
+            .join(", "),
         args.upload_size_limit.display().si(),
         using_upload_expiry.map_or_else(|| "disabled".to_string(), |v| format!("{v:#}")),
         args.upload_mimetypes,
