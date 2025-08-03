@@ -5,6 +5,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::Deserialize;
+use tracing::error;
 
 /// The response for if a file does not exist or for a decryption failure.
 ///
@@ -30,9 +31,17 @@ pub async fn get_upload_handler(
     let storage = state.storage.read().await;
 
     // Don't bother trying to decrypt if we know the file doesn't exist.
-    if !storage.upload_exists(&id).await.unwrap() {
-        return DECRYPT_OR_NOT_FOUND_RESPONSE.into_response();
-    }
+    match state.storage.read().await.upload_exists(&id).await {
+        Ok(exists) => {
+            if !exists {
+                return StatusCode::NOT_FOUND.into_response();
+            }
+        }
+        Err(err) => {
+            error!("Failed to check if upload exists: {}", err);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
     match storage.get_upload(&id, &query.key).await {
         Ok(bytes) => (

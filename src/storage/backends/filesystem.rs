@@ -5,7 +5,7 @@ use std::{
     io::{self, Read},
     time::SystemTime,
 };
-use tracing::debug;
+use tracing::{debug, trace};
 
 #[derive(Debug, Clone)]
 pub struct FilesystemStorage {
@@ -133,7 +133,15 @@ impl StorageOperations for FilesystemStorage {
     async fn last_access(&self, path: &std::path::Path) -> Result<Option<std::time::SystemTime>> {
         let path = self.join_to_base(path)?;
         debug!("Obtaining last access time for {path:?}");
-        let metadata = fs::metadata(path)?;
-        Ok(Some(metadata.accessed()?))
+        let metadata = fs::metadata(&path).context("failed to get file metadata")?;
+        Ok(Some(match metadata.accessed() {
+            Ok(atime) => atime,
+            Err(err) => {
+                trace!("Unable to get atime for {path:?} - using mtime: {err:?}");
+                metadata
+                    .modified()
+                    .context("unable to get mtime or atime for file")?
+            }
+        }))
     }
 }
