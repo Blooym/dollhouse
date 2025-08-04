@@ -170,6 +170,7 @@ async fn main() -> Result<()> {
             TraceLayer::new_for_http()
                 .make_span_with(|request: &Request<_>| {
                     let uri = request.uri().to_string();
+                    // Strip query parameters like ?key from the path to prevent them from being logged.
                     let path_without_query = if let Some(query_start) = uri.find('?') {
                         &uri[..query_start]
                     } else {
@@ -179,10 +180,9 @@ async fn main() -> Result<()> {
                         "request",
                         method = ?request.method(),
                         path = path_without_query,
-                        version = ?request.version(),
                     )
                 })
-                .on_request(DefaultOnRequest::default())
+                .on_request(DefaultOnRequest::default().level(Level::INFO))
                 .on_response(DefaultOnResponse::default().level(Level::INFO))
                 .on_failure(DefaultOnFailure::default()),
         )
