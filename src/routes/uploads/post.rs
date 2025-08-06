@@ -4,14 +4,19 @@ use axum::{
     extract::{Multipart, State},
     http::StatusCode,
 };
+use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, metadata::Orientation};
+use infer::MatcherType;
 use mime_guess::{
     Mime,
     mime::{APPLICATION_OCTET_STREAM, STAR_STAR},
 };
 use rand::seq::IndexedRandom;
 use serde::Serialize;
-use std::str::FromStr;
-use tracing::{debug, error};
+use std::{
+    io::{BufReader, BufWriter, Cursor, Write},
+    str::FromStr,
+};
+use tracing::{debug, error, warn};
 
 const FALLBACK_ENABLED_MIME: Mime = STAR_STAR;
 
@@ -59,7 +64,7 @@ pub async fn create_upload_handler(
 
     // Infer mimetype by magic numbers and check if it is allowed.
     // (Octet stream is used as fallback when */* is allowed, otherwise unknown types are rejected.)
-    let (infer_str, infer_ext) = match infer::get(&upload_bytes) {
+    let (infer_str, infer_ext, matcher_type) = match infer::get(&upload_bytes) {
         Some(infer_result) => {
             // Check if the inferred MIME type is allowed
             if !mime::is_mime_allowed(
@@ -76,7 +81,11 @@ pub async fn create_upload_handler(
                     "Your upload was rejected because uploading files of this type is not permitted",
                 ));
             }
-            (infer_result.mime_type(), infer_result.extension())
+            (
+                infer_result.mime_type(),
+                infer_result.extension(),
+                infer_result.matcher_type(),
+            )
         }
         None => {
             // If no MIME type could be inferred, check if fallback is allowed.
@@ -88,7 +97,11 @@ pub async fn create_upload_handler(
                 debug!(
                     "Could not infer upload MIME type - falling back to application/octet-stream"
                 );
-                (APPLICATION_OCTET_STREAM.essence_str(), "")
+                (
+                    APPLICATION_OCTET_STREAM.essence_str(),
+                    "",
+                    MatcherType::Archive,
+                )
             } else {
                 // Reject as unsupported type.
                 debug!("Rejecting upload - No MIME type could be inferred from content");
@@ -98,6 +111,68 @@ pub async fn create_upload_handler(
                 ));
             }
         }
+    };
+
+    // Additional post-processing.
+    let upload_bytes = match matcher_type {
+        // Strip most EXIF data from images.
+        MatcherType::Image => {
+            match image::guess_format(&upload_bytes) {
+                Ok(ImageFormat::Gif) => upload_bytes, // GIFs cannot be processed as animation data is not preserved.
+                Ok(image_format) => {
+                    const POST_PROCESSING_ERROR: (StatusCode, &str) = (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Your upload could not be completed due to a post-processing error",
+                    );
+
+                    let image_size = upload_bytes.len();
+                    let reader = BufReader::new(Cursor::new(upload_bytes));
+                    let mut decoder = ImageReader::new(reader)
+                        .with_guessed_format()
+                        .map_err(|err| {
+                            error!("Failed to guess image format from upload bytes: {err:?}");
+                            POST_PROCESSING_ERROR
+                        })?
+                        .into_decoder()
+                        .map_err(|err| {
+                            error!("Failed to create image decoder from upload bytes: {err:?}");
+                            POST_PROCESSING_ERROR
+                        })?;
+                    let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
+                    let mut image = DynamicImage::from_decoder(decoder).map_err(|err| {
+                        error!("Failed to decode image from upload bytes: {err:?}");
+                        POST_PROCESSING_ERROR
+                    })?;
+                    image.apply_orientation(orientation);
+
+                    // Re-encode the image without EXIF data
+                    let mut image_bytes = Vec::with_capacity(image_size);
+                    {
+                        let mut writer = BufWriter::new(Cursor::new(&mut image_bytes));
+                        image.write_to(&mut writer, image_format).map_err(|err| {
+                            error!("Failed to write image to bytes: {err:?}");
+                            POST_PROCESSING_ERROR
+                        })?;
+                        writer.flush().map_err(|err| {
+                            error!("Failed to flush image writer: {err:?}");
+                            POST_PROCESSING_ERROR
+                        })?;
+                    }
+
+                    debug!(
+                        "Stripped EXIF data from image upload (original: {} bytes, processed: {} bytes)",
+                        image_size,
+                        image_bytes.len()
+                    );
+                    axum::body::Bytes::from(image_bytes)
+                }
+                Err(err) => {
+                    warn!("Failed to guess image format from upload bytes: {err:?}");
+                    upload_bytes
+                }
+            }
+        }
+        _ => upload_bytes,
     };
 
     // Store file by hash to prevent duplicating uploads.
